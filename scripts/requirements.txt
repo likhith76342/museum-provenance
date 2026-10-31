@@ -1,0 +1,5 @@
+sentence-transformers>=3.0
+psycopg[binary]>=3.2
+pgvector>=0.3
+python-dotenv>=1.0
+numpy
