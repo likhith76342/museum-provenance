@@ -18,10 +18,6 @@ for f in "${FILES[@]}"; do
   fi
 done
 if [ -f scripts/embed_reports.py ]; then
-  if [ -x .venv/bin/python ]; then
-    echo "==> embeddings"; .venv/bin/python scripts/embed_reports.py
-  else
-    echo "--- skipping embeddings (create .venv first, see README)"
-  fi
+  echo "==> embeddings"; docker compose --profile tools run --rm embedder
 fi
 echo "Done."

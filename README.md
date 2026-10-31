@@ -6,8 +6,10 @@ DBMS Level 3 project: PostgreSQL (relational) + pgvector (vector similarity) + N
 1. Install Docker Desktop and start it.
 2. `cp .env.example .env` and set your own password (in both places).
 3. `docker compose up -d`
-4. `./scripts/reset_db.sh` to build schema and seed data.
-5. Embeddings: `python3 -m venv .venv && source .venv/bin/activate && pip install -r scripts/requirements.txt && python scripts/embed_reports.py`
+4. `./scripts/reset_db.sh` to build the schema, load seed data and embed the condition reports.
+   Embeddings run in Docker (`docker compose --profile tools run --rm embedder`), so no local Python is needed.
+   The first run builds the image (CPU-only PyTorch) and downloads the model once into the `hf_cache` volume.
+   Why Docker: PyTorch has no builds for Intel Macs on Python 3.13.
 
 ## Run queries
 ```bash
