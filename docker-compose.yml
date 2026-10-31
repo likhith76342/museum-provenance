@@ -14,5 +14,20 @@ services:
       timeout: 3s
       retries: 10
 
+  embedder:
+    build:
+      context: .
+      dockerfile: scripts/embedder.Dockerfile
+    profiles: ["tools"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - hf_cache:/root/.cache/huggingface
+
 volumes:
   museum_pgdata:
+  hf_cache:
