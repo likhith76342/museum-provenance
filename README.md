@@ -21,5 +21,26 @@ DBMS Level 3 project: PostgreSQL (relational) + pgvector (vector similarity) + N
 - `db/schema`: DDL (00 extensions, 01 core tables, 02 history/condition tables, 99 drop)
 - `db/seed`: sample data
 - `db/queries`: sample queries
+- `db/advanced`: views, functions, procedures, triggers (loaded after seed + embeddings)
+- `db/tests`: feature tests, each rolled back
 - `docs`: problem statement, ER diagram, relational schema
 - `scripts`: helper scripts and embedding generator
+
+## Advanced database features
+| Feature | Object |
+|---|---|
+| Views | v_current_owner, v_provenance_summary, v_latest_condition, v_open_flags |
+| Stored procedures (transactions) | transfer_ownership, review_flag |
+| Functions | artifact_gaps, find_similar_reports, search_reports |
+| Triggers | curator account role, user role change, artifact delete guard, report date validation, grade-change flagging, embedding anomaly flagging |
+| Indexing | composite, partial, HNSW (vector), GIN (full-text) |
+| Full-text search | tsvector generated column + GIN index |
+| Vector similarity search | pgvector cosine distance + HNSW |
+
+Load order: schema → seed (historical import) → embeddings → `db/advanced/*.sql`.
+Triggers apply to data entered after setup.
+
+## Tests
+```bash
+./scripts/run_tests.sh
+```
