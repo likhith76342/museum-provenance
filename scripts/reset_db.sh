@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+run_sql() { echo "==> $1"; ./scripts/psql.sh -q -v ON_ERROR_STOP=1 < "$1"; }
+
+# Stage 1: schema + seed data (seed = historical import, loaded BEFORE any triggers exist)
 FILES=(
   db/schema/99_drop_all.sql
   db/schema/00_extensions.sql
@@ -10,14 +14,20 @@ FILES=(
   db/seed/02_history_condition_seed.sql
 )
 for f in "${FILES[@]}"; do
-  if [ -f "$f" ]; then
-    echo "==> $f"
-    ./scripts/psql.sh -q -v ON_ERROR_STOP=1 < "$f"
-  else
-    echo "--- skipping $f (not created yet)"
-  fi
+  if [ -f "$f" ]; then run_sql "$f"; else echo "--- skipping $f (not created yet)"; fi
 done
+
+# Stage 2: embeddings for the seed reports (Docker, CPU-only torch)
 if [ -f scripts/embed_reports.py ]; then
-  echo "==> embeddings"; docker compose --profile tools run --rm embedder
+  echo "==> embeddings"
+  docker compose --profile tools run --rm embedder
 fi
+
+# Stage 3: advanced features (views, functions, procedures, triggers), in file-name order.
+# Loaded last so triggers only act on data entered from now on.
+for f in db/advanced/*.sql; do
+  [ -e "$f" ] || continue
+  run_sql "$f"
+done
+
 echo "Done."
