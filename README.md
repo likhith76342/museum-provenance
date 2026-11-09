@@ -44,3 +44,26 @@ Triggers apply to data entered after setup.
 ```bash
 ./scripts/run_tests.sh
 ```
+
+## Web app (Next.js)
+Requires Node.js 20.9+.
+```bash
+docker compose up -d                 # database (+ embedding API once merged)
+./scripts/reset_db.sh                # schema, seed, embeddings, advanced features
+cp web/.env.example web/.env.local   # set the same password as in .env
+cd web && npm install && npm run dev # http://localhost:3000
+```
+
+### Demo accounts (seed data)
+| Role | Email | Password |
+|---|---|---|
+| Admin | admin@museum.test | Admin@123 |
+| Curator | meera.iyer@museum.test | Curator@123 |
+| Curator | rahul.menon@museum.test | Curator@123 |
+| Researcher | kavya.nair@uni.test | Research@123 |
+
+### Security model
+Every request runs as `BEGIN; SET LOCAL ROLE app_<role>; ...; COMMIT;`.
+`app_researcher` has SELECT only (no password hashes), `app_curator` can write the catalogue,
+provenance, reports and flags, `app_admin` can also manage users. Login and sessions are
+handled in the database (`app_login`, bcrypt via pgcrypto, SHA-256-hashed session tokens).
