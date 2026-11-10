@@ -2,8 +2,11 @@ import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import ConditionPanel from '@/components/ConditionPanel';
 import RiskBadge from '@/components/RiskBadge';
+import StatusForm from '@/components/StatusForm';
+import TransferForm from '@/components/TransferForm';
 import { requireUser } from '@/lib/auth';
 import { withRole } from '@/lib/db';
+import { EDITORS } from '@/lib/types';
 
 type Artifact = {
   accession_number: string;
@@ -51,6 +54,8 @@ type Gap = {
   gap_days: number;
 };
 
+type Owner = { owner_id: number; owner_name: string; owner_type: string };
+
 /** Negative years are BCE (see artifacts.est_year_from). */
 function year(y: number | null) {
   if (y === null) return '?';
@@ -69,6 +74,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 export default async function ArtifactPage({ params }: { params: Promise<{ accession: string }> }) {
   const user = await requireUser();
   const { accession } = await params;
+  const canEdit = EDITORS.includes(user.role);
 
   const data = await withRole(user, async (db) => {
     const artifact = (await db.query<Artifact>(`
@@ -97,10 +103,14 @@ export default async function ArtifactPage({ params }: { params: Promise<{ acces
 
     const gaps = (await db.query<Gap>('SELECT * FROM artifact_gaps($1)', [accession])).rows;
 
-    return { artifact, summary, chain, gaps };
+    const owners = canEdit
+      ? (await db.query<Owner>('SELECT owner_id, owner_name, owner_type FROM owners ORDER BY owner_name')).rows
+      : [];
+
+    return { artifact, summary, chain, gaps, owners };
   });
   if (!data) notFound();
-  const { artifact: a, summary: s, chain, gaps } = data;
+  const { artifact: a, summary: s, chain, gaps, owners } = data;
 
   return (
     <div className="space-y-8">
@@ -194,6 +204,12 @@ export default async function ArtifactPage({ params }: { params: Promise<{ acces
         )}
       </section>
 
+      {canEdit && (
+        <section className="grid gap-6 md:grid-cols-2">
+          <StatusForm accession={a.accession_number} status={a.status} location={a.current_location} />
+          <TransferForm accession={a.accession_number} owners={owners} />
+        </section>
+      )}
 
       <ConditionPanel accession={a.accession_number} user={user} />
     </div>
