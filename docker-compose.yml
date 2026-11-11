@@ -28,6 +28,26 @@ services:
     volumes:
       - hf_cache:/root/.cache/huggingface
 
+  # Embedding API used by the web app for new condition reports.
+  # Same image/build and model cache as `embedder`; the API never touches the database.
+  embed-api:
+    build:
+      context: .
+      dockerfile: scripts/embedder.Dockerfile
+    container_name: museum_embed_api
+    restart: unless-stopped
+    command: ["uvicorn", "embed_api:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "${EMBED_API_PORT:-8001}:8000"
+    volumes:
+      - hf_cache:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
 volumes:
   museum_pgdata:
   hf_cache:
