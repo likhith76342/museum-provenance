@@ -3,3 +3,5 @@ psycopg[binary]>=3.2
 pgvector>=0.3
 python-dotenv>=1.0
 numpy
+fastapi>=0.110
+uvicorn>=0.29
