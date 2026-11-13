@@ -3,7 +3,11 @@
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { ACQUISITION_METHODS } from '@/app/artifacts/options';
+import { humanize } from '@/components/ui/badges';
+import { Button } from '@/components/ui/Button';
+import { Field, inputClass } from '@/components/ui/Field';
 import { FormError } from '@/components/ui/FormError';
+import { Notice } from '@/components/ui/Notice';
 import { sendJson } from '@/lib/fetch-json';
 
 type Owner = { owner_id: number; owner_name: string; owner_type: string };
@@ -45,46 +49,37 @@ export default function TransferForm({ accession, owners }: { accession: string;
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3 rounded border p-4 text-sm">
-      <h2 className="text-lg font-semibold">Transfer ownership</h2>
-      <label className="block">
-        New owner
-        <select name="new_owner_id" required defaultValue="" className="mt-1 block w-full rounded border p-1.5">
+    <form onSubmit={onSubmit} className="space-y-4">
+      <Field label="New owner">
+        <select name="new_owner_id" required defaultValue="" className={inputClass}>
           <option value="" disabled>Choose an owner</option>
           {owners.map((o) => (
-            <option key={o.owner_id} value={o.owner_id}>{o.owner_name} ({o.owner_type})</option>
+            <option key={o.owner_id} value={o.owner_id}>{o.owner_name} ({humanize(o.owner_type)})</option>
           ))}
         </select>
-      </label>
-      <div className="grid grid-cols-2 gap-2">
-        <label className="block">
-          Date
-          <input name="transfer_date" type="date" required className="mt-1 block w-full rounded border p-1.5" />
-        </label>
-        <label className="block">
-          Method
-          <select name="method" required defaultValue="purchase" className="mt-1 block w-full rounded border p-1.5">
-            {ACQUISITION_METHODS.map((v) => <option key={v} value={v}>{v}</option>)}
+      </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Date">
+          <input name="transfer_date" type="date" required className={inputClass} />
+        </Field>
+        <Field label="Method">
+          <select name="method" required defaultValue="purchase" className={inputClass}>
+            {ACQUISITION_METHODS.map((v) => <option key={v} value={v}>{humanize(v)}</option>)}
           </select>
-        </label>
-        <label className="block">
-          Price (optional)
-          <input name="price" type="number" min="0" step="0.01" className="mt-1 block w-full rounded border p-1.5" />
-        </label>
-        <label className="block">
-          Currency
-          <input name="currency" maxLength={3} placeholder="INR" className="mt-1 block w-full rounded border p-1.5 uppercase" />
-        </label>
+        </Field>
+        <Field label="Price" hint="Optional">
+          <input name="price" type="number" min="0" step="0.01" className={inputClass} />
+        </Field>
+        <Field label="Currency" hint="3-letter code, needed with a price">
+          <input name="currency" maxLength={3} placeholder="INR" className={`${inputClass} uppercase`} />
+        </Field>
       </div>
-      <label className="block">
-        Source document (optional)
-        <input name="document" className="mt-1 block w-full rounded border p-1.5" />
-      </label>
+      <Field label="Source document" hint="Optional">
+        <input name="document" className={inputClass} />
+      </Field>
       <FormError error={error} />
-      {done && <p className="text-green-700">{done}</p>}
-      <button disabled={busy} className="rounded bg-black px-3 py-1.5 text-white disabled:opacity-50">
-        {busy ? 'Transferring…' : 'Transfer'}
-      </button>
+      {done && <Notice tone="good">{done}</Notice>}
+      <Button disabled={busy}>{busy ? 'Transferring…' : 'Transfer'}</Button>
     </form>
   );
 }
