@@ -3,20 +3,21 @@
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { ACQUISITION_METHODS } from '@/app/artifacts/options';
+import { FormError } from '@/components/ui/FormError';
 import { sendJson } from '@/lib/fetch-json';
 
 type Owner = { owner_id: number; owner_name: string; owner_type: string };
 
 export default function TransferForm({ accession, owners }: { accession: string; owners: Owner[] }) {
   const router = useRouter();
-  const [error, setError] = useState('');
+  const [error, setError] = useState<unknown>(null);
   const [done, setDone] = useState('');
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
-    setError('');
+    setError(null);
     setDone('');
     const formEl = e.currentTarget;
     const form = new FormData(formEl);
@@ -37,7 +38,7 @@ export default function TransferForm({ accession, owners }: { accession: string;
       formEl.reset();
       router.refresh();
     } catch (err) {
-      setError((err as Error).message);
+      setError(err);
     } finally {
       setBusy(false);
     }
@@ -79,7 +80,7 @@ export default function TransferForm({ accession, owners }: { accession: string;
         Source document (optional)
         <input name="document" className="mt-1 block w-full rounded border p-1.5" />
       </label>
-      {error && <p className="text-red-600">{error}</p>}
+      <FormError error={error} />
       {done && <p className="text-green-700">{done}</p>}
       <button disabled={busy} className="rounded bg-black px-3 py-1.5 text-white disabled:opacity-50">
         {busy ? 'Transferring…' : 'Transfer'}

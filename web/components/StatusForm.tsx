@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { STATUSES } from '@/app/artifacts/options';
+import { FormError } from '@/components/ui/FormError';
 import { sendJson } from '@/lib/fetch-json';
 
 export default function StatusForm({
@@ -15,14 +16,14 @@ export default function StatusForm({
   location: string | null;
 }) {
   const router = useRouter();
-  const [error, setError] = useState('');
+  const [error, setError] = useState<unknown>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
-    setError('');
+    setError(null);
     setSaved(false);
     const form = new FormData(e.currentTarget);
     try {
@@ -33,7 +34,7 @@ export default function StatusForm({
       setSaved(true);
       router.refresh();
     } catch (err) {
-      setError((err as Error).message);
+      setError(err);
     } finally {
       setBusy(false);
     }
@@ -52,7 +53,7 @@ export default function StatusForm({
         Location
         <input name="current_location" defaultValue={location ?? ''} className="mt-1 block w-full rounded border p-1.5" />
       </label>
-      {error && <p className="text-red-600">{error}</p>}
+      <FormError error={error} />
       {saved && <p className="text-green-700">Saved.</p>}
       <button disabled={busy} className="rounded bg-black px-3 py-1.5 text-white disabled:opacity-50">
         {busy ? 'Saving…' : 'Save'}

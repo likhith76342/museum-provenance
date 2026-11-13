@@ -3,25 +3,26 @@
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { CATEGORIES, STATUSES } from '@/app/artifacts/options';
+import { FormError } from '@/components/ui/FormError';
 import { sendJson } from '@/lib/fetch-json';
 
 const input = 'mt-1 block w-full rounded border p-1.5';
 
 export default function RegisterArtifactForm() {
   const router = useRouter();
-  const [error, setError] = useState('');
+  const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
-    setError('');
+    setError(null);
     const body = Object.fromEntries(new FormData(e.currentTarget));
     try {
       const res = await sendJson<{ accession_number: string }>('/api/artifacts', 'POST', body);
       router.push(`/artifacts/${encodeURIComponent(res.accession_number)}`);
     } catch (err) {
-      setError((err as Error).message);
+      setError(err);
       setBusy(false);
     }
   }
@@ -79,7 +80,7 @@ export default function RegisterArtifactForm() {
         Description
         <textarea name="description" rows={4} className={input} />
       </label>
-      {error && <p className="text-red-600">{error}</p>}
+      <FormError error={error} />
       <button disabled={busy} className="rounded bg-black px-3 py-1.5 text-white disabled:opacity-50">
         {busy ? 'Registering…' : 'Register artifact'}
       </button>

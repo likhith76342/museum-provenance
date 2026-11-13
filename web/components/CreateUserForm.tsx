@@ -2,18 +2,19 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
+import { FormError } from '@/components/ui/FormError';
 import { sendJson } from '@/lib/fetch-json';
 
 export default function CreateUserForm() {
   const router = useRouter();
-  const [error, setError] = useState('');
+  const [error, setError] = useState<unknown>(null);
   const [done, setDone] = useState('');
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
-    setError('');
+    setError(null);
     setDone('');
     const formEl = e.currentTarget;
     try {
@@ -26,7 +27,7 @@ export default function CreateUserForm() {
       formEl.reset();
       router.refresh();
     } catch (err) {
-      setError((err as Error).message);
+      setError(err);
     } finally {
       setBusy(false);
     }
@@ -48,7 +49,7 @@ export default function CreateUserForm() {
           {busy ? 'Creating…' : 'Create'}
         </button>
       </div>
-      {error && <p className="text-red-600">{error}</p>}
+      <FormError error={error} />
       {done && <p className="text-green-700">{done}</p>}
     </form>
   );
