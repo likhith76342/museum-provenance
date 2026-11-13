@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Notice } from '@/components/ui/Notice';
 import { requireUser } from '@/lib/auth';
 import { withRole } from '@/lib/db';
 
@@ -36,7 +37,11 @@ export default async function HomePage({
 
   return (
     <div>
-      {denied && <p className="mb-4 text-sm text-red-600">You don&apos;t have access to that page.</p>}
+      {denied && (
+        <div className="mb-6">
+          <Notice tone="warn">You don&apos;t have access to that page.</Notice>
+        </div>
+      )}
       <h1 className="mb-1 text-2xl font-semibold">Welcome, {user.full_name}</h1>
       <p className="mb-6 text-sm text-gray-500">Signed in as {user.role}</p>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
