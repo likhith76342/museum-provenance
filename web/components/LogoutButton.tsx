@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/Button';
 import { sendJson } from '@/lib/fetch-json';
 
 export default function LogoutButton() {
@@ -13,8 +14,8 @@ export default function LogoutButton() {
   }
 
   return (
-    <button onClick={logout} className="rounded border px-2 py-1 text-sm">
+    <Button variant="secondary" size="sm" onClick={logout}>
       Log out
-    </button>
+    </Button>
   );
 }

@@ -1,9 +1,16 @@
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import ConditionPanel from '@/components/ConditionPanel';
-import RiskBadge from '@/components/RiskBadge';
 import StatusForm from '@/components/StatusForm';
 import TransferForm from '@/components/TransferForm';
+import { Accession } from '@/components/ui/Accession';
+import { Badge } from '@/components/ui/Badge';
+import { ArtifactStatusBadge, humanize, RiskBadge } from '@/components/ui/badges';
+import { Card, SectionTitle } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Notice } from '@/components/ui/Notice';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/Table';
 import { requireUser } from '@/lib/auth';
 import { withRole } from '@/lib/db';
 import { EDITORS } from '@/lib/types';
@@ -62,12 +69,13 @@ function year(y: number | null) {
   return y < 0 ? `${-y} BCE` : String(y);
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+/** One entry of a definition list; empty values show as a dash. */
+function Item({ label, children, wide = false }: { label: string; children: ReactNode; wide?: boolean }) {
   return (
-    <tr className="border-b">
-      <th className="w-48 p-2 text-left font-medium text-gray-600">{label}</th>
-      <td className="p-2">{children ?? '—'}</td>
-    </tr>
+    <div className={wide ? 'sm:col-span-2' : ''}>
+      <dt className="text-xs font-medium uppercase tracking-wider text-stone-500">{label}</dt>
+      <dd className="mt-0.5 text-sm text-ink">{children ?? <span className="text-stone-400">—</span>}</dd>
+    </div>
   );
 }
 
@@ -114,100 +122,112 @@ export default async function ArtifactPage({ params }: { params: Promise<{ acces
 
   return (
     <div className="space-y-8">
-      <div>
-        <p className="text-sm text-gray-500">{a.accession_number}</p>
-        <h1 className="text-2xl font-semibold">{a.title}</h1>
+      <PageHeader
+        title={a.title}
+        subtitle={
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Accession number={a.accession_number} link={false} />
+            <span aria-hidden="true">·</span>
+            <span>{humanize(a.category)}</span>
+          </span>
+        }
+        actions={<ArtifactStatusBadge status={a.status} />}
+      />
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card title="Details" className="lg:col-span-2">
+          <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+            <Item label="Category">{humanize(a.category)}</Item>
+            <Item label="Status"><ArtifactStatusBadge status={a.status} /></Item>
+            <Item label="Location">{a.current_location}</Item>
+            <Item label="Material">{a.material}</Item>
+            <Item label="Origin / culture">{a.origin_culture}</Item>
+            <Item label="Dating">
+              {a.est_year_from === null && a.est_year_to === null ? null : `${year(a.est_year_from)} – ${year(a.est_year_to)}`}
+            </Item>
+            <Item label="Acquired by museum">{a.acquisition_date}</Item>
+            <Item label="Years in collection">{a.years_in_collection}</Item>
+            <Item label="Registered by">{a.registered_by}</Item>
+            <Item label="Description" wide>{a.description}</Item>
+          </dl>
+        </Card>
+
+        <Card title="Provenance risk">
+          <div className="mb-4"><RiskBadge risk={s.provenance_risk} /></div>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-4 lg:grid-cols-1">
+            <Item label="Owners on record">{s.n_owners}</Item>
+            <Item label="Gaps over 1 year">{s.n_gaps}</Item>
+            <Item label="Longest gap">{`${s.longest_gap_days} days`}</Item>
+            <Item label="Unknown acquisitions">{s.n_unknown_acquisitions}</Item>
+            <Item label="Dealer / auction house 1933–1945" wide>{s.wartime_dealer ? 'Yes' : 'No'}</Item>
+          </dl>
+        </Card>
       </div>
 
       <section>
-        <h2 className="mb-2 text-lg font-semibold">Details</h2>
-        <table className="w-full border-collapse text-sm">
-          <tbody>
-            <Field label="Category">{a.category}</Field>
-            <Field label="Status">{a.status}</Field>
-            <Field label="Location">{a.current_location}</Field>
-            <Field label="Material">{a.material}</Field>
-            <Field label="Origin / culture">{a.origin_culture}</Field>
-            <Field label="Dating">
-              {a.est_year_from === null && a.est_year_to === null ? null : `${year(a.est_year_from)} – ${year(a.est_year_to)}`}
-            </Field>
-            <Field label="Acquired by museum">{a.acquisition_date}</Field>
-            <Field label="Years in collection">{a.years_in_collection}</Field>
-            <Field label="Registered by">{a.registered_by}</Field>
-            <Field label="Description">{a.description}</Field>
-          </tbody>
-        </table>
-      </section>
-
-      <section>
-        <h2 className="mb-2 text-lg font-semibold">Provenance risk</h2>
-        <table className="w-full border-collapse text-sm">
-          <tbody>
-            <Field label="Risk"><RiskBadge risk={s.provenance_risk} /></Field>
-            <Field label="Owners on record">{s.n_owners}</Field>
-            <Field label="Gaps over 1 year">{s.n_gaps}</Field>
-            <Field label="Longest gap">{`${s.longest_gap_days} days`}</Field>
-            <Field label="Unknown acquisitions">{s.n_unknown_acquisitions}</Field>
-            <Field label="Dealer / auction house 1933–1945">{s.wartime_dealer ? 'yes' : 'no'}</Field>
-          </tbody>
-        </table>
-      </section>
-
-      <section>
-        <h2 className="mb-2 text-lg font-semibold">Provenance chain</h2>
+        <SectionTitle>Provenance chain</SectionTitle>
         {chain.length === 0 ? (
-          <p className="text-sm text-gray-500">No ownership records.</p>
+          <EmptyState>No ownership records.</EmptyState>
         ) : (
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="border-b text-left">
-                <th className="p-2">Owner</th>
-                <th className="p-2">Type</th>
-                <th className="p-2">From</th>
-                <th className="p-2">Until</th>
-                <th className="p-2">Days held</th>
-                <th className="p-2">Method</th>
-                <th className="p-2">Price</th>
-                <th className="p-2">Source</th>
+          <Table>
+            <THead>
+              <tr>
+                <TH>Owner</TH>
+                <TH>Type</TH>
+                <TH>From</TH>
+                <TH>Until</TH>
+                <TH className="text-right">Days held</TH>
+                <TH>Method</TH>
+                <TH className="text-right">Price</TH>
+                <TH>Source</TH>
               </tr>
-            </thead>
-            <tbody>
+            </THead>
+            <TBody>
               {chain.map((r) => (
-                <tr key={r.acquired_from} className="border-b">
-                  <td className="p-2">{r.owner_name}</td>
-                  <td className="p-2">{r.owner_type}</td>
-                  <td className="p-2">{r.acquired_from}</td>
-                  <td className="p-2">{r.acquired_until ?? 'current'}</td>
-                  <td className="p-2">{r.days_held}</td>
-                  <td className="p-2">{r.acquisition_method}</td>
-                  <td className="p-2">{r.price_paid === null ? '—' : `${r.price_paid.toLocaleString('en-IN')} ${r.currency ?? ''}`}</td>
-                  <td className="p-2">{r.source_document ?? '—'}</td>
-                </tr>
+                <TR key={r.acquired_from}>
+                  <TD className="min-w-44 font-medium">{r.owner_name}</TD>
+                  <TD>{humanize(r.owner_type)}</TD>
+                  <TD className="whitespace-nowrap tabular-nums">{r.acquired_from}</TD>
+                  <TD className="whitespace-nowrap tabular-nums">
+                    {r.acquired_until ?? <Badge tone="info">Current</Badge>}
+                  </TD>
+                  <TD className="text-right tabular-nums">{r.days_held.toLocaleString('en-IN')}</TD>
+                  <TD>{humanize(r.acquisition_method)}</TD>
+                  <TD className="whitespace-nowrap text-right tabular-nums">
+                    {r.price_paid === null ? <span className="text-stone-400">—</span> : `${r.price_paid.toLocaleString('en-IN')} ${r.currency ?? ''}`}
+                  </TD>
+                  <TD className="min-w-48 text-stone-600">{r.source_document ?? <span className="text-stone-400">—</span>}</TD>
+                </TR>
               ))}
-            </tbody>
-          </table>
+            </TBody>
+          </Table>
         )}
       </section>
 
       <section>
-        <h2 className="mb-2 text-lg font-semibold">Gaps in provenance</h2>
+        <SectionTitle>Gaps in provenance</SectionTitle>
         {gaps.length === 0 ? (
-          <p className="text-sm text-gray-500">No gaps longer than one year.</p>
+          <Notice tone="good">No gaps longer than one year.</Notice>
         ) : (
-          <ul className="space-y-2 text-sm">
+          <div className="space-y-2">
             {gaps.map((g) => (
-              <li key={g.gap_from} className="rounded border border-amber-500 bg-amber-50 p-2 text-amber-900">
-                ⚠ {g.gap_from} → {g.gap_to} ({g.gap_days} days unaccounted) between {g.previous_owner} and {g.next_owner}
-              </li>
+              <Notice key={g.gap_from} tone="warn">
+                <strong>{g.gap_days} days unaccounted:</strong> {g.gap_from} → {g.gap_to}, between {g.previous_owner} and{' '}
+                {g.next_owner}
+              </Notice>
             ))}
-          </ul>
+          </div>
         )}
       </section>
 
       {canEdit && (
-        <section className="grid gap-6 md:grid-cols-2">
-          <StatusForm accession={a.accession_number} status={a.status} location={a.current_location} />
-          <TransferForm accession={a.accession_number} owners={owners} />
+        <section className="grid items-start gap-6 md:grid-cols-2">
+          <Card title="Status and location">
+            <StatusForm accession={a.accession_number} status={a.status} location={a.current_location} />
+          </Card>
+          <Card title="Transfer ownership">
+            <TransferForm accession={a.accession_number} owners={owners} />
+          </Card>
         </section>
       )}
 
