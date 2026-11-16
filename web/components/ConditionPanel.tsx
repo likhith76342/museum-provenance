@@ -1,6 +1,11 @@
 import Link from 'next/link';
 import GradeChange from '@/components/GradeChange';
-import { gradeText } from '@/lib/condition';
+import { Badge } from '@/components/ui/Badge';
+import { GradeBadge, InspectionBadge } from '@/components/ui/badges';
+import { Card } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { LinkButton } from '@/components/ui/Button';
+import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/Table';
 import { withRole } from '@/lib/db';
 import type { SessionUser } from '@/lib/types';
 
@@ -20,12 +25,6 @@ type HistoryRow = {
   curator: string;
   excerpt: string;
   n_flags: number;
-};
-
-const BADGE: Record<Latest['inspection_status'], string> = {
-  ok: 'bg-green-100 text-green-800',
-  overdue: 'bg-amber-100 text-amber-800',
-  never_inspected: 'bg-gray-200 text-gray-700',
 };
 
 export default async function ConditionPanel({ accession, user }: { accession: string; user: SessionUser }) {
@@ -51,64 +50,65 @@ export default async function ConditionPanel({ accession, user }: { accession: s
   });
 
   return (
-    <section className="mt-8 text-sm">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Condition</h2>
+    <Card title="Condition">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+          {latest?.condition_grade != null && <GradeBadge grade={latest.condition_grade} />}
+          {latest && <InspectionBadge status={latest.inspection_status} />}
+          {latest?.last_inspected && (
+            <span className="text-stone-600">
+              Last inspected {latest.last_inspected} by {latest.curator_name}
+            </span>
+          )}
+        </div>
         {user.role === 'curator' && (
-          <Link href={`/reports/new?accession=${encodeURIComponent(accession)}`} className="rounded bg-black px-3 py-1.5 text-white">
+          <LinkButton href={`/reports/new?accession=${encodeURIComponent(accession)}`} size="sm">
             File a report for this artifact
-          </Link>
+          </LinkButton>
         )}
       </div>
 
-      {latest && (
-        <p className="mb-3">
-          Latest condition: <strong>{gradeText(latest.condition_grade)}</strong>
-          {latest.last_inspected && <> · last inspected {latest.last_inspected} by {latest.curator_name}</>}{' '}
-          <span className={`rounded px-2 py-0.5 text-xs ${BADGE[latest.inspection_status]}`}>
-            {latest.inspection_status.replace('_', ' ')}
-          </span>
-        </p>
-      )}
-
       {history.length === 0 ? (
-        <p className="text-gray-500">No condition reports yet.</p>
+        <EmptyState>No condition reports yet.</EmptyState>
       ) : (
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="border-b text-left">
-              <th className="p-2">Date</th>
-              <th className="p-2">Grade</th>
-              <th className="p-2">Change</th>
-              <th className="p-2">Curator</th>
-              <th className="p-2">Report</th>
-              <th className="p-2">Flags</th>
+        <Table>
+          <THead>
+            <tr>
+              <TH>Date</TH>
+              <TH>Grade</TH>
+              <TH>Change</TH>
+              <TH>Curator</TH>
+              <TH>Report</TH>
+              <TH>Flags</TH>
             </tr>
-          </thead>
-          <tbody>
+          </THead>
+          <TBody>
             {history.map((r) => (
-              <tr key={r.report_id} className="border-b align-top">
-                <td className="p-2 whitespace-nowrap">
-                  <Link href={`/reports/${r.report_id}`} className="underline">{r.report_date}</Link>
-                </td>
-                <td className="p-2 whitespace-nowrap">{gradeText(r.condition_grade)}</td>
-                <td className="p-2 whitespace-nowrap"><GradeChange change={r.grade_change} /></td>
-                <td className="p-2">{r.curator}</td>
-                <td className="p-2 text-gray-700">{r.excerpt}{r.excerpt.length >= 140 ? '…' : ''}</td>
-                <td className="p-2">
-                  {r.n_flags > 0 ? (
-                    <Link href={`/reports/${r.report_id}`} className="rounded bg-red-100 px-2 py-0.5 text-xs text-red-800">
-                      {r.n_flags} flag{r.n_flags > 1 ? 's' : ''}
+              <TR key={r.report_id}>
+                <TD className="whitespace-nowrap tabular-nums">
+                  <Link href={`/reports/${r.report_id}`} className="text-accent hover:underline">
+                    {r.report_date}
+                  </Link>
+                </TD>
+                <TD className="whitespace-nowrap"><GradeBadge grade={r.condition_grade} /></TD>
+                <TD className="whitespace-nowrap"><GradeChange change={r.grade_change} /></TD>
+                <TD className="min-w-36">{r.curator}</TD>
+                <TD className="min-w-64 text-stone-600">
+                  {r.excerpt}
+                  {r.excerpt.length >= 140 ? '…' : ''}
+                </TD>
+                <TD>
+                  {r.n_flags > 0 && (
+                    <Link href={`/reports/${r.report_id}`}>
+                      <Badge tone="bad">{r.n_flags} {r.n_flags > 1 ? 'flags' : 'flag'}</Badge>
                     </Link>
-                  ) : (
-                    <span className="text-gray-400">—</span>
                   )}
-                </td>
-              </tr>
+                </TD>
+              </TR>
             ))}
-          </tbody>
-        </table>
+          </TBody>
+        </Table>
       )}
-    </section>
+    </Card>
   );
 }

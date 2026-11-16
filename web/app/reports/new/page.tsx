@@ -1,5 +1,7 @@
 import NewReportForm from '@/components/NewReportForm';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { requireUser } from '@/lib/auth';
+import { todayLocal } from '@/lib/condition';
 import { withRole } from '@/lib/db';
 
 export default async function NewReportPage({ searchParams }: { searchParams: Promise<{ accession?: string | string[] }> }) {
@@ -15,8 +17,11 @@ export default async function NewReportPage({ searchParams }: { searchParams: Pr
 
   return (
     <div>
-      <h1 className="mb-4 text-2xl font-semibold">File a condition report</h1>
-      <NewReportForm artifacts={artifacts} initialAccession={initial} />
+      <PageHeader
+        title="File a condition report"
+        subtitle="The text is embedded when you save it, so the database can compare it with every earlier report."
+      />
+      <NewReportForm artifacts={artifacts} initialAccession={initial} today={todayLocal()} />
     </div>
   );
 }
