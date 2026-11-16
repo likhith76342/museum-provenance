@@ -1,7 +1,14 @@
 'use client';
 
+import { type FormEvent, useState } from 'react';
+import { Accession } from '@/components/ui/Accession';
+import { FlagTypeBadge } from '@/components/ui/badges';
+import { Button, LinkButton } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Field, inputClass } from '@/components/ui/Field';
+import { FormError } from '@/components/ui/FormError';
+import { Notice } from '@/components/ui/Notice';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
 import { GRADE_LABELS } from '@/lib/condition';
 import { sendJson } from '@/lib/fetch-json';
 
@@ -15,21 +22,26 @@ type Flag = {
 };
 type Result = { report_id: number; flags: Flag[] };
 
-export default function NewReportForm({ artifacts, initialAccession }: { artifacts: Artifact[]; initialAccession: string }) {
+const MIN_CHARS = 30;
+
+export default function NewReportForm({
+  artifacts,
+  initialAccession,
+  today,
+}: {
+  artifacts: Artifact[];
+  initialAccession: string;
+  today: string;
+}) {
   const [accession, setAccession] = useState(artifacts.some((a) => a.accession_number === initialAccession) ? initialAccession : '');
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState(today);
   const [grade, setGrade] = useState('4');
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [result, setResult] = useState<Result | null>(null);
 
-  // Today in the BROWSER's local date, set after mount so server and client HTML match
-  useEffect(() => {
-    setDate(new Date().toLocaleDateString('en-CA'));
-  }, []);
-
-  async function submit(e: React.FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
@@ -44,86 +56,108 @@ export default function NewReportForm({ artifacts, initialAccession }: { artifac
       setResult(r);
       setText('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
+      setError(err);
     } finally {
       setBusy(false);
     }
   }
 
+  const len = text.trim().length;
+
   return (
-    <div className="max-w-2xl text-sm">
+    <div className="max-w-3xl space-y-6">
       {result && (
-        <div className="mb-4 rounded border border-green-600 bg-green-50 p-3">
-          <p className="font-medium">Report #{result.report_id} saved and embedded.</p>
+        <div className="space-y-4">
+          <Notice tone="good" title={`Report #${result.report_id} saved and embedded`}>
+            <Link href={`/reports/${result.report_id}`} className="underline">View the report</Link>
+          </Notice>
+
           {result.flags.length > 0 ? (
-            <div className="mt-2 rounded border border-red-300 bg-red-50 p-2">
-              <p className="font-medium text-red-800">
-                {result.flags.length} anomaly flag{result.flags.length > 1 ? 's' : ''} raised:
-              </p>
-              <ul className="mt-1 list-disc pl-5">
+            <section className="rounded-lg border-2 border-red-300 bg-red-50 p-5 shadow-sm">
+              <h2 className="mb-3 font-serif text-lg font-semibold text-red-900">
+                {result.flags.length} anomaly {result.flags.length > 1 ? 'flags' : 'flag'} raised
+              </h2>
+              <ul className="space-y-3">
                 {result.flags.map((f) => (
-                  <li key={f.flag_id}>
-                    <strong>{f.flag_type}</strong>
-                    {f.similarity_score != null && <> (similarity {f.similarity_score.toFixed(2)})</>}
+                  <li key={f.flag_id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-red-950">
+                    <FlagTypeBadge type={f.flag_type} />
+                    {f.similarity_score != null && (
+                      <span className="tabular-nums">similarity {f.similarity_score.toFixed(2)}</span>
+                    )}
                     {f.compared_report_id != null && (
-                      <> vs report #{f.compared_report_id}{f.compared_accession ? ` of ${f.compared_accession}` : ''}</>
-                    )}{' '}
-                    — <Link href="/flags" className="underline">review on the flags page</Link>
+                      <span className="inline-flex flex-wrap items-center gap-x-1.5">
+                        compared with report
+                        <Link href={`/reports/${f.compared_report_id}`} className="tabular-nums underline">
+                          #{f.compared_report_id}
+                        </Link>
+                        {f.compared_accession && <Accession number={f.compared_accession} />}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
-            </div>
+              <div className="mt-4">
+                <LinkButton href="/flags">Review on the flags page</LinkButton>
+              </div>
+            </section>
           ) : (
-            <p className="mt-1 text-gray-700">No anomaly flags raised.</p>
+            <Notice tone="info">No anomaly flags were raised.</Notice>
           )}
-          <p className="mt-2"><Link href={`/reports/${result.report_id}`} className="underline">View the report →</Link></p>
         </div>
       )}
 
-      <form onSubmit={submit} className="flex flex-col gap-3">
-        <label className="flex flex-col gap-1">
-          Artifact
-          <select required value={accession} onChange={(e) => setAccession(e.target.value)} className="rounded border p-1.5">
-            <option value="">Choose an artifact…</option>
-            {artifacts.map((a) => (
-              <option key={a.accession_number} value={a.accession_number}>{a.accession_number} — {a.title}</option>
-            ))}
-          </select>
-        </label>
-        <div className="flex gap-4">
-          <label className="flex flex-col gap-1">
-            Report date
-            <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="rounded border p-1.5" />
-          </label>
-          <label className="flex flex-col gap-1">
-            Condition grade
-            <select value={grade} onChange={(e) => setGrade(e.target.value)} className="rounded border p-1.5">
-              {[5, 4, 3, 2, 1].map((g) => (
-                <option key={g} value={g}>{g} — {GRADE_LABELS[g]}</option>
+      <Card>
+        <form onSubmit={submit} className="space-y-4">
+          <Field label="Artifact">
+            <select required value={accession} onChange={(e) => setAccession(e.target.value)} className={inputClass}>
+              <option value="">Choose an artifact…</option>
+              {artifacts.map((a) => (
+                <option key={a.accession_number} value={a.accession_number}>
+                  {a.accession_number} — {a.title}
+                </option>
               ))}
             </select>
-          </label>
-        </div>
-        <label className="flex flex-col gap-1">
-          Report text (min 30 characters)
-          <textarea
-            required
-            minLength={30}
-            maxLength={5000}
-            rows={6}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            className="rounded border p-1.5"
-          />
-          <span className="text-xs text-gray-500">{text.trim().length} characters</span>
-        </label>
-        {error && <p className="rounded border border-red-300 bg-red-50 p-2 text-red-800">{error}</p>}
-        <div>
-          <button disabled={busy} className="rounded bg-black px-4 py-1.5 text-white disabled:opacity-50">
-            {busy ? 'Saving and embedding…' : 'File report'}
-          </button>
-        </div>
-      </form>
+          </Field>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Report date">
+              <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
+            </Field>
+            <Field label="Condition grade">
+              <select value={grade} onChange={(e) => setGrade(e.target.value)} className={inputClass}>
+                {[5, 4, 3, 2, 1].map((g) => (
+                  <option key={g} value={g}>
+                    {g} — {GRADE_LABELS[g]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          <Field
+            label="Report text"
+            hint={
+              len < MIN_CHARS
+                ? `${len} characters (at least ${MIN_CHARS} needed)`
+                : `${len} characters`
+            }
+          >
+            <textarea
+              required
+              minLength={MIN_CHARS}
+              maxLength={5000}
+              rows={7}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+
+          <FormError error={error} />
+
+          <Button disabled={busy}>{busy ? 'Embedding and saving…' : 'File report'}</Button>
+        </form>
+      </Card>
     </div>
   );
 }

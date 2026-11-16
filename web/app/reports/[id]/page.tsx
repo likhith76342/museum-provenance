@@ -1,7 +1,15 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { Accession } from '@/components/ui/Accession';
+import { Badge } from '@/components/ui/Badge';
+import { FlagStatusBadge, FlagTypeBadge, GradeBadge } from '@/components/ui/badges';
+import { LinkButton } from '@/components/ui/Button';
+import { Card, SectionTitle } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Notice } from '@/components/ui/Notice';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/Table';
 import { requireUser } from '@/lib/auth';
-import { gradeText } from '@/lib/condition';
 import { withRole } from '@/lib/db';
 
 type Report = {
@@ -30,6 +38,29 @@ type FlagRow = {
   compared_report_id: number | null;
 };
 
+/** A match on a DIFFERENT artifact at or above this similarity is worth a second look. */
+const HOT = 0.8;
+
+function SimilarityBar({ value, hot }: { value: number; hot: boolean }) {
+  const pct = Math.max(0, Math.min(100, value * 100));
+  return (
+    <div className="flex items-center gap-2">
+      <div className="h-1.5 w-24 overflow-hidden rounded-full bg-stone-100">
+        <div className={`h-full rounded-full ${hot ? 'bg-red-500' : 'bg-accent'}`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className="tabular-nums">{pct.toFixed(1)}%</span>
+    </div>
+  );
+}
+
+function ReportLink({ id }: { id: number }) {
+  return (
+    <Link href={`/reports/${id}`} className="tabular-nums text-accent hover:underline">
+      #{id}
+    </Link>
+  );
+}
+
 export default async function ReportPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   const id = Number((await params).id);
@@ -56,85 +87,119 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   });
   if (!data) notFound();
   const { report, similar, flags } = data;
+  const hasHot = similar.some((s) => !s.same_artifact && s.similarity >= HOT);
 
   return (
-    <div className="text-sm">
-      <p className="mb-1">
-        <Link href={`/artifacts/${encodeURIComponent(report.accession_number)}`} className="underline">
-          ← {report.accession_number}
-        </Link>
-      </p>
-      <h1 className="mb-3 text-2xl font-semibold">Condition report #{report.report_id}</h1>
-      <table className="mb-4 border-collapse">
-        <tbody>
-          <tr><td className="py-1 pr-6 text-gray-500">Artifact</td><td>{report.accession_number} — {report.title}</td></tr>
-          <tr><td className="py-1 pr-6 text-gray-500">Date</td><td>{report.report_date}</td></tr>
-          <tr><td className="py-1 pr-6 text-gray-500">Grade</td><td>{gradeText(report.condition_grade)}</td></tr>
-          <tr><td className="py-1 pr-6 text-gray-500">Curator</td><td>{report.curator}</td></tr>
-        </tbody>
-      </table>
-      <p className="mb-6 max-w-3xl whitespace-pre-wrap rounded border p-3">{report.report_text}</p>
+    <div className="space-y-8">
+      <PageHeader
+        title={`Condition report #${report.report_id}`}
+        subtitle={
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Accession number={report.accession_number} />
+            <span aria-hidden="true">·</span>
+            <span>{report.title}</span>
+            <span aria-hidden="true">·</span>
+            <span className="tabular-nums">{report.report_date}</span>
+            <span aria-hidden="true">·</span>
+            <span>{report.curator}</span>
+          </span>
+        }
+        actions={
+          <>
+            <GradeBadge grade={report.condition_grade} />
+            <LinkButton href={`/artifacts/${encodeURIComponent(report.accession_number)}`} variant="secondary" size="sm">
+              View artifact
+            </LinkButton>
+          </>
+        }
+      />
 
-      <h2 className="mb-2 text-xl font-semibold">Most similar reports</h2>
-      <table className="mb-6 w-full border-collapse">
-        <thead>
-          <tr className="border-b text-left">
-            <th className="p-2">Report</th>
-            <th className="p-2">Artifact</th>
-            <th className="p-2">Date</th>
-            <th className="p-2">Grade</th>
-            <th className="p-2">Same artifact?</th>
-            <th className="p-2">Similarity</th>
-          </tr>
-        </thead>
-        <tbody>
-          {similar.map((s) => (
-            <tr key={s.report_id} className="border-b">
-              <td className="p-2"><Link href={`/reports/${s.report_id}`} className="underline">#{s.report_id}</Link></td>
-              <td className="p-2">
-                <Link href={`/artifacts/${encodeURIComponent(s.accession_number)}`} className="underline">{s.accession_number}</Link>
-              </td>
-              <td className="p-2">{s.report_date}</td>
-              <td className="p-2">{gradeText(s.condition_grade)}</td>
-              <td className="p-2">{s.same_artifact ? 'same artifact' : <strong>different artifact</strong>}</td>
-              <td className="p-2">{s.similarity.toFixed(4)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <Card title="Report text">
+        <p className="max-w-prose whitespace-pre-wrap leading-relaxed text-ink">{report.report_text}</p>
+      </Card>
 
-      <h2 className="mb-2 text-xl font-semibold">Anomaly flags involving this report</h2>
-      {flags.length === 0 ? (
-        <p className="text-gray-500">None.</p>
-      ) : (
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="border-b text-left">
-              <th className="p-2">Flag</th>
-              <th className="p-2">Type</th>
-              <th className="p-2">Status</th>
-              <th className="p-2">Flagged report</th>
-              <th className="p-2">Compared with</th>
-              <th className="p-2">Similarity</th>
-            </tr>
-          </thead>
-          <tbody>
-            {flags.map((f) => (
-              <tr key={f.flag_id} className="border-b">
-                <td className="p-2">#{f.flag_id}</td>
-                <td className="p-2">{f.flag_type}</td>
-                <td className="p-2">{f.status}</td>
-                <td className="p-2"><Link href={`/reports/${f.report_id}`} className="underline">#{f.report_id}</Link></td>
-                <td className="p-2">
-                  {f.compared_report_id ? <Link href={`/reports/${f.compared_report_id}`} className="underline">#{f.compared_report_id}</Link> : '—'}
-                </td>
-                <td className="p-2">{f.similarity_score == null ? '—' : f.similarity_score.toFixed(4)}</td>
+      <section className="space-y-3">
+        <SectionTitle>Most similar reports</SectionTitle>
+        {hasHot && (
+          <Notice tone="warn" title="A report on a different artifact reads almost the same">
+            {"That can mean this report was filed under the wrong object."}
+          </Notice>
+        )}
+        {similar.length === 0 ? (
+          <EmptyState>No other reports to compare with.</EmptyState>
+        ) : (
+          <Table>
+            <THead>
+              <tr>
+                <TH>Report</TH>
+                <TH>Artifact</TH>
+                <TH>Date</TH>
+                <TH>Grade</TH>
+                <TH>Match</TH>
+                <TH>Similarity</TH>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      <p className="mt-4"><Link href="/flags" className="underline">All anomaly flags →</Link></p>
+            </THead>
+            <TBody>
+              {similar.map((s) => {
+                const hot = !s.same_artifact && s.similarity >= HOT;
+                return (
+                  <TR key={s.report_id} className={hot ? 'bg-red-50/50' : ''}>
+                    <TD><ReportLink id={s.report_id} /></TD>
+                    <TD><Accession number={s.accession_number} /></TD>
+                    <TD className="whitespace-nowrap tabular-nums">{s.report_date}</TD>
+                    <TD className="whitespace-nowrap"><GradeBadge grade={s.condition_grade} /></TD>
+                    <TD>
+                      {s.same_artifact ? (
+                        <Badge tone="neutral">Same artifact</Badge>
+                      ) : (
+                        <Badge tone="warn">Different artifact</Badge>
+                      )}
+                    </TD>
+                    <TD><SimilarityBar value={s.similarity} hot={hot} /></TD>
+                  </TR>
+                );
+              })}
+            </TBody>
+          </Table>
+        )}
+      </section>
+
+      <section>
+        <SectionTitle>Anomaly flags involving this report</SectionTitle>
+        {flags.length === 0 ? (
+          <EmptyState>No flags involve this report.</EmptyState>
+        ) : (
+          <Table>
+            <THead>
+              <tr>
+                <TH>Flag</TH>
+                <TH>Type</TH>
+                <TH>Status</TH>
+                <TH>Flagged report</TH>
+                <TH>Compared with</TH>
+                <TH className="text-right">Similarity</TH>
+              </tr>
+            </THead>
+            <TBody>
+              {flags.map((f) => (
+                <TR key={f.flag_id}>
+                  <TD className="tabular-nums">#{f.flag_id}</TD>
+                  <TD><FlagTypeBadge type={f.flag_type} /></TD>
+                  <TD><FlagStatusBadge status={f.status} /></TD>
+                  <TD><ReportLink id={f.report_id} /></TD>
+                  <TD>{f.compared_report_id ? <ReportLink id={f.compared_report_id} /> : <span className="text-stone-400">—</span>}</TD>
+                  <TD className="text-right tabular-nums">
+                    {f.similarity_score == null ? <span className="text-stone-400">—</span> : f.similarity_score.toFixed(2)}
+                  </TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        )}
+        <div className="mt-4">
+          <LinkButton href="/flags" variant="secondary" size="sm">All anomaly flags</LinkButton>
+        </div>
+      </section>
     </div>
   );
 }
