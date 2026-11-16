@@ -1,5 +1,12 @@
 import Link from 'next/link';
 import FlagReview from '@/components/FlagReview';
+import { Accession } from '@/components/ui/Accession';
+import { FlagStatusBadge, FlagTypeBadge } from '@/components/ui/badges';
+import { Card, SectionTitle } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Notice } from '@/components/ui/Notice';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/Table';
 import { requireUser } from '@/lib/auth';
 import { fmtTs } from '@/lib/condition';
 import { withRole } from '@/lib/db';
@@ -32,6 +39,21 @@ type ResolvedFlag = {
   review_notes: string | null;
 };
 
+function Excerpt({ label, id, date, text }: { label: string; id: number; date: string; text: string }) {
+  return (
+    <div className="min-w-0 rounded-md border border-stone-200 bg-stone-50 p-3 text-sm">
+      <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-stone-500">
+        {label}{' '}
+        <Link href={`/reports/${id}`} className="tabular-nums normal-case tracking-normal text-accent hover:underline">
+          #{id}
+        </Link>{' '}
+        <span className="normal-case tracking-normal tabular-nums">({date})</span>
+      </p>
+      <p className="text-stone-700">{text}…</p>
+    </div>
+  );
+}
+
 export default async function FlagsPage() {
   const user = await requireUser();
   const canReview = EDITORS.includes(user.role);
@@ -52,78 +74,92 @@ export default async function FlagsPage() {
   });
 
   return (
-    <div className="text-sm">
-      <h1 className="mb-4 text-2xl font-semibold">Anomaly flags</h1>
+    <div className="space-y-8">
+      <PageHeader
+        title="Anomaly flags"
+        subtitle={`${open.length} open or under review · ${resolved.length} resolved`}
+      />
 
-      <h2 className="mb-2 text-xl font-semibold">Open / under review ({open.length})</h2>
-      {open.length === 0 && <p className="mb-6 text-gray-500">No unresolved flags.</p>}
-      <div className="mb-8 flex flex-col gap-4">
+      {!canReview && (
+        <Notice tone="info">{"Read-only: researchers can't review flags."}</Notice>
+      )}
+
+      <section className="space-y-4">
+        <SectionTitle>Open and under review</SectionTitle>
+        {open.length === 0 && <EmptyState>No unresolved flags.</EmptyState>}
         {open.map((f) => (
-          <div key={f.flag_id} className="rounded border p-3">
-            <p className="mb-2">
-              <strong>#{f.flag_id} {f.flag_type}</strong> · {f.accession_number} — {f.title} · status:{' '}
-              <strong>{f.status}</strong> · similarity: {f.similarity_score == null ? '—' : f.similarity_score.toFixed(2)} · raised{' '}
-              {fmtTs(f.raised_at)}
+          <Card key={f.flag_id}>
+            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+              <span className="text-sm tabular-nums text-stone-500">#{f.flag_id}</span>
+              <FlagTypeBadge type={f.flag_type} />
+              <FlagStatusBadge status={f.status} />
+              <Accession number={f.accession_number} />
+              <span className="text-sm text-stone-700">{f.title}</span>
+              {f.similarity_score != null && (
+                <span className="text-sm tabular-nums text-stone-600">similarity {f.similarity_score.toFixed(2)}</span>
+              )}
+            </div>
+            <p className="mb-3 text-xs text-stone-500">
+              Raised {fmtTs(f.raised_at)}
               {f.reviewer && <> · reviewer: {f.reviewer}</>}
             </p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded border bg-gray-50 p-2">
-                <p className="mb-1 text-xs text-gray-500">
-                  Flagged report <Link href={`/reports/${f.report_id}`} className="underline">#{f.report_id}</Link> ({f.report_date})
-                </p>
-                {f.report_excerpt}…
-              </div>
-              <div className="rounded border bg-gray-50 p-2">
-                {f.compared_report_id ? (
-                  <>
-                    <p className="mb-1 text-xs text-gray-500">
-                      Compared with <Link href={`/reports/${f.compared_report_id}`} className="underline">#{f.compared_report_id}</Link> ({f.compared_report_date})
-                    </p>
-                    {f.compared_excerpt}…
-                  </>
-                ) : (
-                  <span className="text-gray-500">No comparison report.</span>
-                )}
-              </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Excerpt label="Flagged report" id={f.report_id} date={f.report_date} text={f.report_excerpt} />
+              {f.compared_report_id != null && f.compared_report_date != null ? (
+                <Excerpt
+                  label="Compared with"
+                  id={f.compared_report_id}
+                  date={f.compared_report_date}
+                  text={f.compared_excerpt ?? ''}
+                />
+              ) : (
+                <div className="rounded-md border border-dashed border-stone-300 p-3 text-sm text-stone-500">
+                  No comparison report for this flag.
+                </div>
+              )}
             </div>
             {canReview && <FlagReview flagId={f.flag_id} status={f.status} />}
-          </div>
+          </Card>
         ))}
-      </div>
+      </section>
 
-      <h2 className="mb-2 text-xl font-semibold">Resolved ({resolved.length})</h2>
-      {resolved.length === 0 ? (
-        <p className="text-gray-500">Nothing resolved yet.</p>
-      ) : (
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="border-b text-left">
-              <th className="p-2">Flag</th>
-              <th className="p-2">Type</th>
-              <th className="p-2">Artifact</th>
-              <th className="p-2">Outcome</th>
-              <th className="p-2">Similarity</th>
-              <th className="p-2">Reviewer</th>
-              <th className="p-2">Reviewed</th>
-              <th className="p-2">Notes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {resolved.map((f) => (
-              <tr key={f.flag_id} className="border-b align-top">
-                <td className="p-2">#{f.flag_id}</td>
-                <td className="p-2">{f.flag_type}</td>
-                <td className="p-2">{f.accession_number}</td>
-                <td className="p-2">{f.status}</td>
-                <td className="p-2">{f.similarity_score == null ? '—' : f.similarity_score.toFixed(2)}</td>
-                <td className="p-2">{f.reviewer ?? '—'}</td>
-                <td className="p-2 whitespace-nowrap">{fmtTs(f.reviewed_at)}</td>
-                <td className="p-2">{f.review_notes ?? '—'}</td>
+      <section>
+        <SectionTitle>Resolved</SectionTitle>
+        {resolved.length === 0 ? (
+          <EmptyState>Nothing resolved yet.</EmptyState>
+        ) : (
+          <Table>
+            <THead>
+              <tr>
+                <TH>Flag</TH>
+                <TH>Type</TH>
+                <TH>Artifact</TH>
+                <TH>Outcome</TH>
+                <TH className="text-right">Similarity</TH>
+                <TH>Reviewer</TH>
+                <TH>Reviewed</TH>
+                <TH>Notes</TH>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            </THead>
+            <TBody>
+              {resolved.map((f) => (
+                <TR key={f.flag_id}>
+                  <TD className="tabular-nums">#{f.flag_id}</TD>
+                  <TD><FlagTypeBadge type={f.flag_type} /></TD>
+                  <TD><Accession number={f.accession_number} /></TD>
+                  <TD><FlagStatusBadge status={f.status} /></TD>
+                  <TD className="text-right tabular-nums">
+                    {f.similarity_score == null ? <span className="text-stone-400">—</span> : f.similarity_score.toFixed(2)}
+                  </TD>
+                  <TD className="min-w-32">{f.reviewer ?? <span className="text-stone-400">—</span>}</TD>
+                  <TD className="whitespace-nowrap tabular-nums">{fmtTs(f.reviewed_at)}</TD>
+                  <TD className="min-w-56 text-stone-600">{f.review_notes ?? <span className="text-stone-400">—</span>}</TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        )}
+      </section>
     </div>
   );
 }
